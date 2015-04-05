@@ -9,6 +9,19 @@
 void lispParserInit(QIODevice* stream);
 QVariant lispParse();
 
+QString stripQuotes(const QString& s)
+{
+    if (s.length() < 2) return s;
+    if (s[0] == '"' && s[s.length() - 1] == '"')
+    {
+        return s.mid(1, s.length() - 2);
+    }
+    else
+    {
+        return s;
+    }
+}
+
 void writeCellRef(QXmlStreamWriter &stream, const QVariantList &v)
 {
     stream.writeStartElement("cellRef");
@@ -131,18 +144,53 @@ void writeInstance(QXmlStreamWriter &stream, const QVariantList &v)
     if (vViewRef.type() == QVariant::List)
     {
         QVariantList l = vViewRef.toList();
-        if (l[0].toString() != "viewRef")
+        if (l[0].toString() == "viewRef")
         {
-            qWarning("Wrong instance cell description");
+            writeCellRef(stream, l[2].toList());
         }
         else
         {
-            writeCellRef(stream, l[2].toList());
+            qWarning("Wrong instance cell description");
         }
     }
     else
     {
         qWarning("Wrong instance description");
+    }
+
+    if (v.size() > 3)
+    {
+        if (v[3].type() == QVariant::List)
+        {
+            QVariantList l = v[3].toList();
+            if (l[0].toString() == "property")
+            {
+                QString propertyName = l[1].toString();
+
+                QVariant vValue = l[2];
+                if (vValue.type() == QVariant::List)
+                {
+                    QVariantList l2 = vValue.toList();
+                    QString valueType = l2[0].toString();
+                    if (valueType == "string")
+                    {
+                        QString value = stripQuotes(l2[1].toString());
+                        stream.writeStartElement("property");
+                        stream.writeAttribute("name", propertyName);
+                        stream.writeAttribute("value", value);
+                        stream.writeEndElement();
+                    }
+                    else
+                    {
+                        qWarning("Unsupported value type '%s' for property", qPrintable(valueType));
+                    }
+                }
+            }
+            else
+            {
+                qWarning("Wrong instance cell description");
+            }
+        }
     }
 
     stream.writeEndElement();
