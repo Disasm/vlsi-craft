@@ -1,0 +1,74 @@
+library(reglogic) {
+  cell(BUF) {
+    area: 9;
+    pin(A) { direction: input; }
+    pin(Y) { direction: output;
+              function: "A"; }
+  }
+  cell(NOT) {
+    area: 9;
+    pin(A) { direction: input; }
+    pin(Y) { direction: output;
+              function: "A'"; }
+  }
+  cell(AND2) {
+    area: 12;
+    pin(A) { direction: input; }
+    pin(B) { direction: input; }
+    pin(Y) { direction: output;
+             function: "(A*B)"; }
+  }
+  cell(AND3) {
+    area: 9;
+    pin(A) { direction: input; }
+    pin(B) { direction: input; }
+    pin(C) { direction: input; }
+    pin(Y) { direction: output;
+             function: "(A*B*C)"; }
+  }
+  cell(NAND2) {
+    area: 12;
+    pin(A) { direction: input; }
+    pin(B) { direction: input; }
+    pin(Y) { direction: output;
+             function: "(A*B)'"; }
+  }
+  cell(NAND3) {
+    area: 9;
+    pin(A) { direction: input; }
+    pin(B) { direction: input; }
+    pin(C) { direction: input; }
+    pin(Y) { direction: output;
+             function: "(A*B*C)'"; }
+  }
+  cell(OR3) {
+    area: 9;
+    pin(A) { direction: input; }
+    pin(B) { direction: input; }
+    pin(C) { direction: input; }
+    pin(Y) { direction: output;
+             function: "(A+B+C)"; }
+  }
+  cell(NOR3) {
+    area: 9;
+    pin(A) { direction: input; }
+    pin(B) { direction: input; }
+    pin(C) { direction: input; }
+    pin(Y) { direction: output;
+             function: "(A+B+C)'"; }
+  }
+  cell(XOR2) {
+    area: 9;
+    pin(A) { direction: input; }
+    pin(B) { direction: input; }
+    pin(Y) { direction: output;
+             function: "(A^B)"; }
+  }
+  cell(XNOR2) {
+    area: 9;
+    pin(A) { direction: input; }
+    pin(B) { direction: input; }
+    pin(Y) { direction: output;
+             function: "(A^B)'"; }
+  }
+}
