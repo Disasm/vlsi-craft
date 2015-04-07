@@ -258,7 +258,7 @@ void writeNet(QXmlStreamWriter &stream, const QVariantList &v)
         QVariantList l = v[2].toList();
         if (l[0].toString() == "joined")
         {
-            for (int i = 1; i < v.size(); i++)
+            for (int i = 1; i < l.size(); i++)
             {
                 QVariant v2 = l[i];
                 if (v2.type() == QVariant::List)
