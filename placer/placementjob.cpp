@@ -111,7 +111,7 @@ PlacementJob::parseArea(QXmlStreamReader &xml)
 
                 if (sx.isEmpty() || sy.isEmpty() || sz.isEmpty())
                 {
-                    parserError(xml, "pad coordinates are invalid");
+                    parserError(xml, "area coordinates are invalid");
                     return false;
                 }
 
@@ -124,7 +124,7 @@ PlacementJob::parseArea(QXmlStreamReader &xml)
 
                 if (!okX || !okY || !okZ)
                 {
-                    parserError(xml, "can't convert pad coordinates into numbers");
+                    parserError(xml, "can't convert area coordinates into numbers");
                     return false;
                 }
 
