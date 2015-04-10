@@ -8,16 +8,17 @@
 #include "coomatrix.h"
 #include "common/netlist.h"
 #include "placementjob.h"
+#include <QStringList>
 
 typedef struct {
-    int n, nGates, nPads;
-    QMap<int, QString> indexToName;
-    QMap<QString, int> nameToIndex;
-    QSet<int> gateIndexes;
-    QSet<int> padIndexes;
+    //int n, nGates, nPads;
+    //QMap<int, QString> indexToName;
+    //QMap<QString, int> nameToIndex;
+    QSet<QString> gates;
+    QSet<QString> pads;
 
-    QMap<int, QPointF> coords; // index->point
-    QMultiMap<int, int> nets; // net->index
+    QMap<QString, QPointF> coords; // index->point
+    QMultiMap<QString, QString> nets; // net->index
 
     // Geometrical parameters
     QPointF topLeft;
@@ -31,36 +32,18 @@ readJob(Job &job, const Netlist *netlist, const PlacementJob *placementJob)
     QList<QString> gates = netlist->allGates();
     QList<QString> pads = netlist->allPads();
 
-    job.n = 0;
-    job.nGates = gates.size();
-    job.nPads = pads.size();
+    job.gates = gates.toSet();
+    job.pads = pads.toSet();
 
-    for (int i = 0; i < job.nGates; i++)
+    foreach (const QString &padName, pads)
     {
-        QString name = gates[i];
-        int index = job.n++;
-
-        job.indexToName[index] = name;
-        job.nameToIndex[name] = index;
-        job.gateIndexes.insert(index);
-    }
-
-    for (int i = 0; i < job.nPads; i++)
-    {
-        QString name = pads[i];
-        int index = job.n++;
-
-        job.indexToName[index] = name;
-        job.nameToIndex[name] = index;
-        job.padIndexes.insert(index);
-
         int x, y, z;
-        if (!netlist->position(name, x, y, z))
+        if (!netlist->position(padName, x, y, z))
         {
-            qWarning("Can't get pad coordinates for %s", qPrintable(name));
+            qWarning("Can't get pad coordinates for %s", qPrintable(padName));
             return false;
         }
-        job.coords[index] = QPointF(x, y);
+        job.coords[padName] = QPointF(x, y);
     }
 
     QList<QString> nets = netlist->allNets();
@@ -71,13 +54,12 @@ readJob(Job &job, const Netlist *netlist, const PlacementJob *placementJob)
         QList<QString> items = netlist->itemsByNet(netName);
         foreach (const QString &item, items)
         {
-            int itemIndex = job.nameToIndex.value(item, -1);
-            if (itemIndex == -1)
+            if (!job.gates.contains(item) && !job.pads.contains(item))
             {
-                qWarning("Can't get index for item %s", qPrintable(item));
+                qWarning("Can't find item %s", qPrintable(item));
                 return false;
             }
-            job.nets.insertMulti(i, itemIndex);
+            job.nets.insertMulti(netName, item);
         }
     }
 
@@ -94,28 +76,27 @@ readJob(Job &job, const Netlist *netlist, const PlacementJob *placementJob)
 void
 savePlacement(NetPlacement &placement, const Job &job)
 {
-    foreach (int index, job.gateIndexes)
+    foreach (const QString &gateName, job.gates)
     {
-        QString name = job.indexToName[index];
-        QPointF p = job.coords[index];
+        QPointF p = job.coords[gateName];
 
         GatePlacement gp(p.x(), p.y(), 0);
-        placement[name] = gp;
+        placement[gateName] = gp;
     }
 }
 
 void solveQP(Job &job)
 {
     // Build equivalent graph
-    QMap<QPair<int, int>, double> edgeWeights;
-    foreach (int net, job.nets.keys().toSet())
+    QMap<QPair<QString, QString>, double> edgeWeights;
+    foreach (const QString &net, job.nets.keys().toSet())
     {
-        QList<int> points = job.nets.values(net);
+        QList<QString> points = job.nets.values(net);
         if (points.size() <= 1) continue;
         if (points.size() == 2)
         {
-            int p1 = points.first();
-            int p2 = points.last();
+            QString p1 = points.first();
+            QString p2 = points.last();
             edgeWeights[qMakePair(p1, p2)] += 1.0;
             edgeWeights[qMakePair(p2, p1)] += 1.0;
         }
@@ -136,20 +117,31 @@ void solveQP(Job &job)
     }
 
     // Build Connectivity matrix
-    CooMatrix C(job.nGates);
+    CooMatrix C(job.gates.size());
 
-    QList<QPair<int, int> > edges = edgeWeights.keys();
+    QMap<QString, int> gateIndexes;
+    QMap<int, QString> gateIndexesRev;
+    foreach (const QString &gateName, job.gates)
+    {
+        int index = gateIndexes.size();
+        gateIndexes[gateName] = index;
+        gateIndexesRev[index] = gateName;
+    }
+
+    QList<QPair<QString, QString> > edges = edgeWeights.keys();
     for (int i = 0; i < edges.size(); i++)
     {
-        QPair<int, int> edge = edges[i];
-        if (job.gateIndexes.contains(edge.first) && job.gateIndexes.contains(edge.second))
+        QPair<QString, QString> edge = edges[i];
+        if (job.gates.contains(edge.first) && job.gates.contains(edge.second))
         {
-            C.add(edge.first, edge.second, edgeWeights[edge]);
+            int i1 = gateIndexes[edge.first];
+            int i2 = gateIndexes[edge.second];
+            C.add(i1, i2, edgeWeights[edge]);
         }
     }
 
     // Build matrix A
-    CooMatrix A(job.nGates);
+    CooMatrix A(job.gates.size());
 
     QMap<int, double> sums;
     for (int i = 0; i < C.nnz(); i++)
@@ -164,40 +156,50 @@ void solveQP(Job &job)
     }
     for (int i = 0; i < edges.size(); i++)
     {
-        QPair<int, int> edge = edges[i];
-        if (job.padIndexes.contains(edge.first) && job.gateIndexes.contains(edge.second))
+        QPair<QString, QString> edge = edges[i];
+        if (job.pads.contains(edge.first) && job.gates.contains(edge.second))
         {
-            sums[edge.second] += edgeWeights[edge];
+            int i2 = gateIndexes[edge.second];
+            sums[i2] += edgeWeights[edge];
         }
     }
-    for (int i = 0; i < job.nGates; i++)
+    for (int i = 0; i < job.gates.size(); i++)
     {
         A.add(i, i, sums[i]);
     }
 
     // Build bx and by
-    Array bx(job.nGates);
-    Array by(job.nGates);
+    Array bx(job.gates.size());
+    Array by(job.gates.size());
 
     for (int i = 0; i < edges.size(); i++)
     {
-        QPair<int, int> edge = edges[i];
-        if (job.padIndexes.contains(edge.first) && job.gateIndexes.contains(edge.second))
+        QPair<QString, QString> edge = edges[i];
+        if (job.pads.contains(edge.first) && job.gates.contains(edge.second))
         {
-            bx[edge.second] += edgeWeights[edge] * (job.coords[edge.first].x() - job.topLeft.x());
-            by[edge.second] += edgeWeights[edge] * (job.coords[edge.first].y() - job.topLeft.y());
+            int i2 = gateIndexes[edge.second];
+            bx[i2] += edgeWeights[edge] * (job.coords[edge.first].x() - job.topLeft.x());
+            by[i2] += edgeWeights[edge] * (job.coords[edge.first].y() - job.topLeft.y());
         }
     }
 
     // Solve
     Array x = A.solve(bx);
     Array y = A.solve(by);
-    for (int i = 0; i < job.nGates; i++)
+    for (int i = 0; i < job.gates.size(); i++)
     {
         QPointF p(x[i] + job.topLeft.x(), y[i] + job.topLeft.y());
 
-        job.coords[i] = p;
+        QString gateName = gateIndexesRev[i];
+        job.coords[gateName] = p;
     }
+}
+
+bool operator <(const QPointF &a, const QPointF &b)
+{
+    if (a.x() < b.x()) return true;
+    if (a.x() > b.x()) return false;
+    return a.y() < b.y();
 }
 
 struct QPairFirstComparer
@@ -214,91 +216,37 @@ split(Job &childJob1, Job &childJob2, const Job &parentJob)
 {
     bool splitByX = !(parentJob.size.height() > 1.5 * parentJob.size.width());
 
-    QList<QPair<double, int> > coords;
-    for (int i = 0; i < parentJob.nGates; i++)
+    QList<QPair<QPointF, QString> > coords;
+    foreach (const QString &gateName, parentJob.gates)
     {
-        QPointF p = parentJob.coords.value(i);
-        coords.append(qMakePair(splitByX?p.x():p.y(), i));
+        QPointF p = parentJob.coords.value(gateName);
+        QPointF p2 = splitByX?p:QPointF(p.y(), p.x());
+        coords.append(qMakePair(p2, gateName));
     }
     qSort(coords.begin(), coords.end(), QPairFirstComparer());
 
     int half = coords.size() / 2;
-    QList<int> ind1, ind2;
+    QList<QString> gates1, gates2;
     for (int i = 0; i < coords.size(); i++)
     {
-        QPair<double, int> p = coords[i];
+        QPair<QPointF, QString> p = coords[i];
         if (i < half)
         {
-            ind1.append(p.second);
+            gates1.append(p.second);
         }
         else
         {
-            ind2.append(p.second);
+            gates2.append(p.second);
         }
     }
 
-    childJob1.nGates = ind1.size();
-    childJob2.nGates = ind2.size();
+    // Create gates
+    childJob1.gates = gates1.toSet();
+    childJob2.gates = gates2.toSet();
 
-    // Create pads for all other gates
-    childJob1.nPads = parentJob.nPads + childJob2.nGates;
-    childJob2.nPads = parentJob.nPads + childJob1.nGates;
-
-    // Update gate names and indexes
-    for (int i = 0; i < ind1.size(); i++)
-    {
-        int oldIndex = ind1[i];
-        QString name = parentJob.indexToName[oldIndex];
-        childJob1.indexToName[i] = name;
-        childJob1.nameToIndex[name] = i;
-        childJob1.gateIndexes.insert(i);
-    }
-    for (int i = 0; i < ind2.size(); i++)
-    {
-        int oldIndex = ind2[i];
-        QString name = parentJob.indexToName[oldIndex];
-        childJob2.indexToName[i] = name;
-        childJob2.nameToIndex[name] = i;
-        childJob2.gateIndexes.insert(i);
-    }
-    childJob1.n = ind1.size();
-    childJob2.n = ind2.size();
-    for (int i = 0; i < parentJob.nPads; i++)
-    {
-        int oldIndex = parentJob.nGates + i;
-        QString name = parentJob.indexToName[oldIndex];
-
-        int i1 = childJob1.n + i;
-        int i2 = childJob1.n + i;
-        childJob1.indexToName[i1] = name;
-        childJob2.indexToName[i2] = name;
-        childJob1.nameToIndex[name] = i1;
-        childJob2.nameToIndex[name] = i2;
-        childJob1.padIndexes.insert(i1);
-        childJob2.padIndexes.insert(i2);
-    }
-    childJob1.n += parentJob.nPads;
-    childJob2.n += parentJob.nPads;
-    for (int i = 0; i < ind1.size(); i++)
-    {
-        int oldIndex = ind1[i];
-        QString name = parentJob.indexToName[oldIndex];
-        int newIndex = childJob2.n + i;
-        childJob2.indexToName[newIndex] = name;
-        childJob2.nameToIndex[name] = newIndex;
-        childJob2.padIndexes.insert(newIndex);
-    }
-    for (int i = 0; i < ind2.size(); i++)
-    {
-        int oldIndex = ind2[i];
-        QString name = parentJob.indexToName[oldIndex];
-        int newIndex = childJob1.n + i;
-        childJob1.indexToName[newIndex] = name;
-        childJob1.nameToIndex[name] = newIndex;
-        childJob1.padIndexes.insert(newIndex);
-    }
-    childJob1.n += ind2.size();
-    childJob2.n += ind1.size();
+    // Create pads
+    childJob1.pads = parentJob.pads + childJob2.gates;
+    childJob2.pads = parentJob.pads + childJob1.gates;
 
     // Update geometrical parameters
     childJob1.topLeft = parentJob.topLeft;
@@ -318,58 +266,49 @@ split(Job &childJob1, Job &childJob2, const Job &parentJob)
     childJob1.size = QSizeF(childJob1.bottomRight.x() - childJob1.topLeft.x(), childJob1.bottomRight.y() - childJob1.topLeft.y());
 
     // Recalculate coordinates
-    for (int i = 0; i < childJob1.nPads; i++)
+    foreach (const QString &padName, childJob1.pads)
     {
-        int newPadIndex = childJob1.nGates + i;
-        QString name = childJob1.indexToName[newPadIndex];
-        int oldIndex = parentJob.nameToIndex[name];
-        QPointF p = parentJob.coords.value(oldIndex);
+        QPointF p = parentJob.coords.value(padName);
 
         p.setX(qMin(p.x(), childJob1.bottomRight.x()));
         p.setX(qMax(p.x(), childJob1.topLeft.x()));
         p.setY(qMin(p.y(), childJob1.bottomRight.y()));
         p.setY(qMax(p.y(), childJob1.topLeft.y()));
 
-        childJob1.coords[newPadIndex] = p;
+        childJob1.coords[padName] = p;
     }
-    for (int i = 0; i < childJob2.nPads; i++)
+    foreach (const QString &padName, childJob2.pads)
     {
-        int newPadIndex = childJob2.nGates + i;
-        QString name = childJob2.indexToName[newPadIndex];
-        int oldIndex = parentJob.nameToIndex[name];
-        QPointF p = parentJob.coords.value(oldIndex);
+        QPointF p = parentJob.coords.value(padName);
 
         p.setX(qMin(p.x(), childJob2.bottomRight.x()));
         p.setX(qMax(p.x(), childJob2.topLeft.x()));
         p.setY(qMin(p.y(), childJob2.bottomRight.y()));
         p.setY(qMax(p.y(), childJob2.topLeft.y()));
 
-        childJob2.coords[newPadIndex] = p;
+        childJob2.coords[padName] = p;
     }
 
     // Recalculate nets
-    QSet<int> nets = parentJob.nets.keys().toSet();
-    foreach (int net, nets)
+    QSet<QString> nets = parentJob.nets.keys().toSet();
+    foreach (const QString &net, nets)
     {
-        QList<int> oldIndexes = parentJob.nets.values(net);
+        QList<QString> itemNames = parentJob.nets.values(net);
         bool hasGates1 = false;
         bool hasGates2 = false;
         QList<QString> names;
-        foreach (int oldIndex, oldIndexes)
+        foreach (const QString &itemName, itemNames)
         {
-            QString name = parentJob.indexToName[oldIndex];
-            names.append(name);
+            names.append(itemName);
 
-            if (parentJob.gateIndexes.contains(oldIndex))
+            if (parentJob.gates.contains(itemName))
             {
-                int i1 = childJob1.nameToIndex.value(name, -1);
-                if (childJob1.gateIndexes.contains(i1))
+                if (childJob1.gates.contains(itemName))
                 {
                     hasGates1 = true;
                 }
 
-                int i2 = childJob2.nameToIndex.value(name, -1);
-                if (childJob2.gateIndexes.contains(i2))
+                if (childJob2.gates.contains(itemName))
                 {
                     hasGates2 = true;
                 }
@@ -379,16 +318,14 @@ split(Job &childJob1, Job &childJob2, const Job &parentJob)
         {
             foreach (const QString &name, names)
             {
-                int i = childJob1.nameToIndex.value(name, -1);
-                if (i != -1) childJob1.nets.insertMulti(net, i);
+                childJob1.nets.insertMulti(net, name);
             }
         }
         if (hasGates2)
         {
             foreach (const QString &name, names)
             {
-                int i = childJob2.nameToIndex.value(name, -1);
-                if (i != -1) childJob2.nets.insertMulti(net, i);
+                childJob2.nets.insertMulti(net, name);
             }
         }
     }
@@ -397,22 +334,70 @@ split(Job &childJob1, Job &childJob2, const Job &parentJob)
 void
 backAnnotate(Job &parentJob, const Job &childJob)
 {
-    for (int i = 0; i < childJob.nGates; i++)
+    foreach (const QString &gateName, childJob.gates)
     {
-        QString name = childJob.indexToName[i];
-        QPointF c = childJob.coords[i];
+        parentJob.coords[gateName] = childJob.coords[gateName];
+    }
+}
 
-        int parentIndex = parentJob.nameToIndex[name];
-        parentJob.coords[parentIndex] = c;
+float
+calculateHPWL(Job &job)
+{
+    float hpwl = 0;
+
+    QSet<QString> nets = job.nets.keys().toSet();
+    foreach (const QString &netName, nets)
+    {
+        QList<QString> items = job.nets.values(netName);
+        QList<QPointF> points;
+        foreach (const QString &itemName, items)
+        {
+            if (!job.coords.contains(itemName))
+            {
+                return -1;
+            }
+            QPointF p = job.coords.value(itemName);
+            points.append(p);
+        }
+
+        QPointF min = points.first();
+        QPointF max = min;
+        foreach (const QPointF &p, points)
+        {
+            min.setX(qMin(min.x(), p.x()));
+            min.setY(qMin(min.y(), p.y()));
+
+            max.setX(qMax(max.x(), p.x()));
+            max.setY(qMax(max.y(), p.y()));
+        }
+
+        hpwl += qAbs(max.x() - min.x()) + qAbs(max.y() - min.y());
+    }
+    return hpwl;
+}
+
+void
+printSolution(Job &job)
+{
+    QList<QString> gates = job.gates.toList();
+    qSort(gates);
+
+    foreach (const QString &gateName, gates)
+    {
+        QPointF p = job.coords.value(gateName);
+        qDebug("%s [%5.2f;%5.2f]", qPrintable(gateName), p.x(), p.y());
     }
 }
 
 void
 solveRecursively(Job &job)
 {
+    //qDebug("QP[0]: %d gates, HPWL %0.2f", job.gates.size(), calculateHPWL(job));
     solveQP(job);
+    //qDebug("QP[1]: %d gates, HPWL %0.2f", job.gates.size(), calculateHPWL(job));
+    //printSolution(job);
 
-    if (job.nGates >= 4)
+    if (job.gates.size() >= 6)
     {
         Job childJob1;
         Job childJob2;
@@ -425,6 +410,9 @@ solveRecursively(Job &job)
         backAnnotate(job, childJob1);
         backAnnotate(job, childJob2);
     }
+
+    //qDebug("QP[2]: %d gates, HPWL %0.2f", job.gates.size(), calculateHPWL(job));
+    //printSolution(job);
 }
 
 NetPlacement
