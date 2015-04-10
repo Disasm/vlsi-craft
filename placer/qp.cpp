@@ -264,6 +264,7 @@ split(Job &childJob1, Job &childJob2, const Job &parentJob)
         childJob2.topLeft = QPointF(parentJob.topLeft.x(), y);
     }
     childJob1.size = QSizeF(childJob1.bottomRight.x() - childJob1.topLeft.x(), childJob1.bottomRight.y() - childJob1.topLeft.y());
+    childJob2.size = QSizeF(childJob2.bottomRight.x() - childJob2.topLeft.x(), childJob2.bottomRight.y() - childJob2.topLeft.y());
 
     // Recalculate coordinates
     foreach (const QString &padName, childJob1.pads)
