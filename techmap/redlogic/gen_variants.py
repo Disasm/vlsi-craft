@@ -156,9 +156,14 @@ def save_cell_xml(f, tabs, cellName, variants):
         # deduce rotation
         rotation = 0
         for p in v:
-            if p[0] == 'Y':
-                rotation = rs.index(p[1:])
-                break
+            if cellName == "NOT":
+                if p[0] == 'A':
+                    rotation = (rs.index(p[1:]) + 2) % 4
+                    break
+            else:
+                if p[0] == 'Y':
+                    rotation = rs.index(p[1:])
+                    break
 
         f.write("%s<variant name=\"%s\">\n" % (tabsStr2, varName))
 
