@@ -9,19 +9,19 @@ legalize(NetPlacement &p, const Netlist *netlist, const PlacementJob *placementJ
     Vector<int> min = placementJob->minCoordinates();
     Vector<int> max = placementJob->maxCoordinates();
 
-    qDebug("BoundingBox: [%d;%d] [%d;%d]", min.x, min.y, max.x, max.y);
+    qDebug("BoundingBox: [%d;%d] [%d;%d]", min.x, min.z, max.x, max.z);
 
     int xSize = max.x - min.x + 1;
-    int ySize = max.y - min.y + 1;
+    int zSize = max.z - min.z + 1;
 
     int blockSize = 3;
 
     int xBlocks = xSize / blockSize;
-    int yBlocks = ySize / blockSize;
+    int zBlocks = zSize / blockSize;
 
-    qDebug("Blocks: %dx%d", xBlocks, yBlocks);
+    qDebug("Blocks: %dx%d", xBlocks, zBlocks);
 
-    if ((xBlocks * yBlocks) < p.size())
+    if ((xBlocks * zBlocks) < p.size())
     {
         qDebug("No enough place for legalization");
         return false;
@@ -30,12 +30,12 @@ legalize(NetPlacement &p, const Netlist *netlist, const PlacementJob *placementJ
     QSet<QString> unplacedGates = p.keys().toSet();
     for (int xi = 0; xi < xBlocks; xi++)
     {
-        for (int yi = 0; yi < yBlocks; yi++)
+        for (int zi = 0; zi < zBlocks; zi++)
         {
             int xc = min.x + xi * blockSize + (blockSize / 2);
-            int yc = min.y + yi * blockSize + (blockSize / 2);
+            int zc = min.z + zi * blockSize + (blockSize / 2);
 
-            float minDistance = xSize + ySize;
+            float minDistance = xSize + zSize;
             QString minGate;
 
             foreach (const QString &gateName, unplacedGates)
@@ -43,8 +43,8 @@ legalize(NetPlacement &p, const Netlist *netlist, const PlacementJob *placementJ
                 GatePlacement gp = p[gateName];
 
                 float dx = xc - gp.x;
-                float dy = yc - gp.y;
-                float d = sqrtf(dx*dx + dy*dy);
+                float dz = zc - gp.z;
+                float d = sqrtf(dx*dx + dz*dz);
                 if (d < minDistance)
                 {
                     minDistance = d;
@@ -56,8 +56,8 @@ legalize(NetPlacement &p, const Netlist *netlist, const PlacementJob *placementJ
 
             GatePlacement &gp = p[minGate];
             gp.x = xc - 1;
-            gp.y = yc - 1;
-            gp.z = min.z;
+            gp.y = min.y;
+            gp.z = zc - 1;
             unplacedGates.remove(minGate);
 
             if (unplacedGates.isEmpty()) break;

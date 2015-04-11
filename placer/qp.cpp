@@ -66,8 +66,8 @@ readJob(Job &job, const Netlist *netlist, const PlacementJob *placementJob)
     Vector<int> min = placementJob->minCoordinates();
     Vector<int> max = placementJob->maxCoordinates();
 
-    job.topLeft = QPointF(min.x, min.y);
-    job.bottomRight = QPointF(max.x, max.y);
+    job.topLeft = QPointF(min.x, min.z);
+    job.bottomRight = QPointF(max.x, max.z);
     job.size = QSizeF(job.bottomRight.x() - job.topLeft.x(), job.bottomRight.y() - job.topLeft.y());
 
     return true;
@@ -80,7 +80,7 @@ savePlacement(NetPlacement &placement, const Job &job)
     {
         QPointF p = job.coords[gateName];
 
-        GatePlacement gp(p.x(), p.y(), 0);
+        GatePlacement gp(p.x(), 0, p.y());
         placement[gateName] = gp;
     }
 }

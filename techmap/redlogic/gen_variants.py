@@ -114,23 +114,23 @@ def save_cell_blocks_xml(f, tabs, cellName, rotation, ports):
     tabsStr = "    " * tabs
     tabsStr2 = "    " * (tabs + 1)
 
-    xSize = ySize = 3
-    dx = dy = 1
+    xSize = zSize = 3
+    dx = dz = 1
     if cellName == "PAD":
-        xSize = ySize = 1
-        dx = dy = 0
+        xSize = zSize = 1
+        dx = dz = 0
 
     f.write("%s<blocks>\n" % tabsStr)
     for x in range(xSize):
-        for y in range(ySize):
-            f.write("%s<block type=\"$stone\" rotation=\"0\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr2, x, y, 0))
+        for z in range(zSize):
+            f.write("%s<block type=\"$stone\" rotation=\"0\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr2, x, 0, z))
 
     for p in ports:
-        f.write("%s<block type=\"$blockage\" rotation=\"0\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr2, p[1] + dx, p[2] + dy, 1))
+        f.write("%s<block type=\"$blockage\" rotation=\"0\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr2, p[1] + dx, 1, p[2] + dz))
 
     if cellName != "PAD":
         name = "$" + cellName.lower()
-        f.write("%s<block type=\"%s\" rotation=\"%s\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr2, name, rotation, dx, dy, 1))
+        f.write("%s<block type=\"%s\" rotation=\"%s\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr2, name, rotation, dx, 1, dz))
     f.write("%s</blocks>\n" % tabsStr)
 
 def save_cell_xml(f, tabs, cellName, variants):
@@ -140,11 +140,11 @@ def save_cell_xml(f, tabs, cellName, variants):
     tabsStr4 = "    " * (tabs + 3)
     rs = get_rotations()
 
-    xSize = ySize = 3
-    zSize = 2
+    xSize = zSize = 3
+    ySize = 2
     dx = dy = dz = 1
     if cellName == "PAD":
-        xSize = ySize = 1
+        xSize = zSize = 1
         dx = dy = 0
 
     f.write("%s<cell name=\"%s\" xSize=\"%d\" ySize=\"%d\" zSize=\"%d\">\n" % (tabsStr, cellName, xSize, ySize, zSize))
@@ -164,7 +164,7 @@ def save_cell_xml(f, tabs, cellName, variants):
 
         f.write("%s<ports>\n" % tabsStr3)
         for p in v:
-            f.write("%s<port name=\"%s\" x=\"%d\" y=\"%d\" z=\"1\"/>\n" % (tabsStr4, p[0], p[1] + dx, p[2] + dy))
+            f.write("%s<port name=\"%s\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr4, p[0], p[1] + dx, dy, p[2] + dz))
         f.write("%s</ports>\n" % tabsStr3)
 
         save_cell_blocks_xml(f, tabs + 2, cellName, rotation, v)

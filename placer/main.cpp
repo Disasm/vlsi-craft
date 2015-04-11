@@ -483,7 +483,7 @@ int main(int argc, char *argv[])
 
     /*foreach (GatePlacement p, placement)
     {
-        qDebug("%0.3f;%0.3f", p.x, p.y);
+        qDebug("%0.3f;%0.3f", p.x, p.z);
     }*/
 
     if (!saveRountingTask(args[3], netlist, variants))
