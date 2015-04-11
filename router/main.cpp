@@ -780,7 +780,7 @@ saveResults(const QString &filePath)
         {
             stream.writeStartElement("block");
             stream.writeAttribute("type", QString("$wire%1").arg(color));
-            stream.writeAttribute("rotation", "0");
+            stream.writeAttribute("rotation", "-1");
             stream.writeAttribute("x", QString::number(p.x));
             stream.writeAttribute("y", QString::number(p.y));
             stream.writeAttribute("z", QString::number(p.z));
@@ -793,7 +793,7 @@ saveResults(const QString &filePath)
         {
             stream.writeStartElement("block");
             stream.writeAttribute("type", QString("$fswire%1").arg(color));
-            stream.writeAttribute("rotation", "0");
+            stream.writeAttribute("rotation", "-1");
             stream.writeAttribute("x", QString::number(p.x));
             stream.writeAttribute("y", QString::number(p.y));
             stream.writeAttribute("z", QString::number(p.z));

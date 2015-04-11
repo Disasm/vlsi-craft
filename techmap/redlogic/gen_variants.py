@@ -123,10 +123,10 @@ def save_cell_blocks_xml(f, tabs, cellName, rotation, ports):
     f.write("%s<blocks>\n" % tabsStr)
     for x in range(xSize):
         for z in range(zSize):
-            f.write("%s<block type=\"$stone\" rotation=\"0\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr2, x, 0, z))
+            f.write("%s<block type=\"$stone\" rotation=\"-1\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr2, x, 0, z))
 
     for p in ports:
-        f.write("%s<block type=\"$blockage\" rotation=\"0\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr2, p[1] + dx, 1, p[2] + dz))
+        f.write("%s<block type=\"$blockage\" rotation=\"-1\" x=\"%d\" y=\"%d\" z=\"%d\"/>\n" % (tabsStr2, p[1] + dx, 1, p[2] + dz))
 
     if cellName != "PAD":
         name = "$" + cellName.lower()
