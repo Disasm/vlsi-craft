@@ -14,8 +14,10 @@ legalize(NetPlacement &p, const Netlist *netlist, const PlacementJob *placementJ
     int xSize = max.x - min.x + 1;
     int ySize = max.y - min.y + 1;
 
-    int xBlocks = xSize / 3;
-    int yBlocks = ySize / 3;
+    int blockSize = 3;
+
+    int xBlocks = xSize / blockSize;
+    int yBlocks = ySize / blockSize;
 
     qDebug("Blocks: %dx%d", xBlocks, yBlocks);
 
@@ -30,8 +32,8 @@ legalize(NetPlacement &p, const Netlist *netlist, const PlacementJob *placementJ
     {
         for (int yi = 0; yi < yBlocks; yi++)
         {
-            int xc = min.x + xi * 3 + 1;
-            int yc = min.y + yi * 3 + 1;
+            int xc = min.x + xi * blockSize + (blockSize / 2);
+            int yc = min.y + yi * blockSize + (blockSize / 2);
 
             float minDistance = xSize + ySize;
             QString minGate;
