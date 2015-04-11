@@ -47,6 +47,28 @@ fixNetlist(Netlist * netlist, PlacementJob * job)
     return true;
 }
 
+NetPlacement
+generateRandomPlacement(Netlist * netlist, const PlacementJob *placementJob)
+{
+    NetPlacement placement;
+
+    Vector<int> min = placementJob->minCoordinates();
+    Vector<int> max = placementJob->maxCoordinates();
+    Vector<int> size = max - min;
+
+    QList<QString> gates = netlist->allGates();
+    foreach (const QString &gateName, gates)
+    {
+        GatePlacement gp;
+        gp.x = min.x + qrand() % size.x;
+        gp.y = min.y + qrand() % size.y;
+        gp.z = min.z + qrand() % size.z;
+        placement[gateName] = gp;
+    }
+
+    return placement;
+}
+
 void
 applyPlacement(Netlist * netlist, NetPlacement &p)
 {
@@ -57,8 +79,99 @@ applyPlacement(Netlist * netlist, NetPlacement &p)
     }
 }
 
+int
+calculateHPWL(Netlist * netlist, CellVariantFile * variants)
+{
+    int hpwl = 0;
+    foreach (const QString &netName, netlist->allNets())
+    {
+        QList<QPair<QString, QString> > itemsAndPorts = netlist->itemsAndPortsByNet(netName);
+
+        QList<Vector<int> > points;
+
+        for (int i = 0; i < itemsAndPorts.size(); i++)
+        {
+            Vector<int> p;
+            QString itemName = itemsAndPorts[i].first;
+            QString portName = itemsAndPorts[i].second;
+            QString cellType = netlist->cellType(itemName);
+            QString variant = netlist->variant(itemName);
+            netlist->position(itemName, p.x, p.y, p.z);
+
+            CellVariantList list = variants->variantList(cellType);
+            CellVariant var = list.variant(variant);
+
+            Vector<int> pp;
+            var.portPosition(pp, portName);
+
+            pp = pp + p;
+            points.append(pp);
+        }
+
+        Vector<int> max = points.first();
+        Vector<int> min = points.first();
+
+        for (int i = 1; i < points.size(); i++)
+        {
+            Vector<int> p = points[i];
+            if (p.x < min.x) min.x = p.x;
+            if (p.x > max.x) max.x = p.x;
+            if (p.y < min.y) min.y = p.y;
+            if (p.y > max.y) max.y = p.y;
+            if (p.z < min.z) min.z = p.z;
+            if (p.z > max.z) max.z = p.z;
+        }
+
+        hpwl += qAbs(max.x - min.x) + qAbs(max.y - min.y) + qAbs(max.z - min.z);
+    }
+    return hpwl;
+}
+
+void
+optimizePlacementHPWL(Netlist * netlist, CellVariantFile * variants, int iterations)
+{
+    QVector<QString> gates = netlist->allGates().toVector();
+    if (gates.size() <= 1) return;
+
+    int lastHPWL = calculateHPWL(netlist, variants);
+
+    int goodSwaps = 0;
+    for (int i = 0; i < iterations; i++)
+    {
+        int i1 = qrand() % gates.size();
+        int i2 = qrand() % gates.size();
+        while (i1 != i2) i2 = qrand() % gates.size();
+
+        int x1, y1, z1;
+        int x2, y2, z2;
+
+        netlist->position(gates[i1], x1, y1, z1);
+        netlist->position(gates[i2], x2, y2, z2);
+
+        // Swap gates
+        netlist->setPosition(gates[i1], x2, y2, z2);
+        netlist->setPosition(gates[i2], x1, y1, z1);
+
+        int newHPWL = calculateHPWL(netlist, variants);
+        if (newHPWL < lastHPWL)
+        {
+            // Confirm swap
+            lastHPWL = newHPWL;
+            goodSwaps++;
+            continue;
+        }
+        else
+        {
+            // Undo swap
+            netlist->setPosition(gates[i1], x1, y1, z1);
+            netlist->setPosition(gates[i2], x2, y2, z2);
+        }
+    }
+    qDebug("Good swaps: %d", goodSwaps);
+}
+
 bool
-optimizeVariants(Netlist * netlist, CellVariantFile * variants)
+fixGateVariants(Netlist * netlist, CellVariantFile * variantFile)
 {
     // Just take first cell variant for each gate
 
@@ -72,15 +185,58 @@ optimizeVariants(Netlist * netlist, CellVariantFile * variants)
             return false;
         }
 
-        CellVariantList varList = variants->variantList(cellType);
+        CellVariantList varList = variantFile->variantList(cellType);
         if (!varList.isValid())
         {
             qWarning("Can't get variant list for cell %s", qPrintable(cellType));
             return false;
         }
 
+        QList<CellVariant> vars = varList.allVariants();
         CellVariant variant = varList.allVariants().first();
         netlist->setVariant(itemName, variant.name());
+    }
+
+    return true;
+}
+
+bool
+optimizeVariants(Netlist * netlist, CellVariantFile * variantFile)
+{
+    QList<QString> items = netlist->allItems();
+    foreach (const QString &itemName, items)
+    {
+        QString cellType = netlist->cellType(itemName);
+        if (cellType.isEmpty())
+        {
+            qWarning("Can't get cell type for item %s", qPrintable(itemName));
+            return false;
+        }
+
+        CellVariantList varList = variantFile->variantList(cellType);
+        if (!varList.isValid())
+        {
+            qWarning("Can't get variant list for cell %s", qPrintable(cellType));
+            return false;
+        }
+
+        QList<CellVariant> variants = varList.allVariants();
+
+        QString minVariant = netlist->variant(itemName);
+        int minHPWL = calculateHPWL(netlist, variantFile);
+
+        foreach (const CellVariant &v, variants)
+        {
+            netlist->setVariant(itemName, v.name());
+            int hpwl = calculateHPWL(netlist, variantFile);
+            if (hpwl < minHPWL)
+            {
+                minHPWL = hpwl;
+                minVariant = v.name();
+            }
+        }
+
+        netlist->setVariant(itemName, minVariant);
     }
 
     return true;
@@ -285,6 +441,7 @@ int main(int argc, char *argv[])
     }
 
     NetPlacement placement = placeQuad(netlist, job);
+    NetPlacement rp = generateRandomPlacement(netlist, job);
 
     if (!legalize(placement, netlist, job))
     {
@@ -292,18 +449,42 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    if (!legalize(rp, netlist, job))
+    {
+        qWarning("Can't legalize placement");
+        return 1;
+    }
+
+
+    applyPlacement(netlist, rp);
+    if (!fixGateVariants(netlist, variants))
+    {
+        qWarning("Can't optimize variants");
+        return 1;
+    }
+    qDebug("Random HPWL: %d", calculateHPWL(netlist, variants));
+
     applyPlacement(netlist, placement);
 
-    if (!optimizeVariants(netlist, variants))
+    if (!fixGateVariants(netlist, variants))
     {
         qWarning("Can't optimize variants");
         return 1;
     }
 
-    foreach (GatePlacement p, placement)
+    qDebug("Optimized HPWL: %d", calculateHPWL(netlist, variants));
+
+    optimizeVariants(netlist, variants);
+
+    qDebug("Optimized HPWL2: %d", calculateHPWL(netlist, variants));
+
+    //optimizePlacementHPWL(netlist, variants, 10000);
+    //qDebug("Optimized HPWL3: %d", calculateHPWL(netlist, variants));
+
+    /*foreach (GatePlacement p, placement)
     {
         qDebug("%0.3f;%0.3f", p.x, p.y);
-    }
+    }*/
 
     if (!saveRountingTask(args[3], netlist, variants))
     {
