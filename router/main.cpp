@@ -741,6 +741,77 @@ colorize()
     return true;
 }
 
+bool
+saveResults(const QString &filePath)
+{
+    QFile f(filePath);
+    if (!f.open(QFile::WriteOnly | QFile::Truncate))
+    {
+        qCritical("Can't open XML file");
+        return 1;
+    }
+
+    QXmlStreamWriter stream(&f);
+    stream.setAutoFormatting(true);
+    stream.writeStartDocument();
+
+    stream.writeStartElement("blocks");
+
+    foreach (const Block &block, blocks)
+    {
+        if (block.type == "$blockage") continue;
+
+        stream.writeStartElement("block");
+        stream.writeAttribute("type", block.type);
+        stream.writeAttribute("rotation", QString::number(block.rotation));
+        stream.writeAttribute("x", QString::number(block.p.x));
+        stream.writeAttribute("y", QString::number(block.p.y));
+        stream.writeAttribute("z", QString::number(block.p.z));
+        stream.writeEndElement();
+    }
+    int wirelength = 0;
+    foreach (const QString &netName, routes.keys())
+    {
+        stream.writeComment(QString(" Net '%1' ").arg(netName));
+        int color = netColors.value(netName, -1);
+
+        /* Place wires on pads.  */
+        foreach (const Point &p, netlist[netName])
+        {
+            stream.writeStartElement("block");
+            stream.writeAttribute("type", QString("$wire%1").arg(color));
+            stream.writeAttribute("rotation", "0");
+            stream.writeAttribute("x", QString::number(p.x));
+            stream.writeAttribute("y", QString::number(p.y));
+            stream.writeAttribute("z", QString::number(p.z));
+            stream.writeEndElement();
+        }
+
+        QList<Point> route = routes[netName].toList();
+        qSort(route);
+        foreach (const Point &p, route)
+        {
+            stream.writeStartElement("block");
+            stream.writeAttribute("type", QString("$fswire%1").arg(color));
+            stream.writeAttribute("rotation", "0");
+            stream.writeAttribute("x", QString::number(p.x));
+            stream.writeAttribute("y", QString::number(p.y));
+            stream.writeAttribute("z", QString::number(p.z));
+            stream.writeEndElement();
+            wirelength++;
+        }
+    }
+
+    stream.writeEndElement();
+
+    stream.writeEndDocument();
+    f.close();
+
+    qDebug("Wirelength: %d", wirelength);
+
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
@@ -783,6 +854,8 @@ int main(int argc, char *argv[])
         qWarning("Can't colorize");
         return 1;
     }
+
+    saveResults(args[2]);
 
     return 0;
 }
