@@ -398,7 +398,7 @@ solveRecursively(Job &job)
     //qDebug("QP[1]: %d gates, HPWL %0.2f", job.gates.size(), calculateHPWL(job));
     //printSolution(job);
 
-    if (job.gates.size() >= 6)
+    if (job.gates.size() >= 2)
     {
         Job childJob1;
         Job childJob2;
