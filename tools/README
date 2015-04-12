@@ -1,1 +1,7 @@
 Place compiled tools here (or make symlinks)
+
+* yosys
+* edif2xml
+* placer
+* router
+* slicer
