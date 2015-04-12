@@ -145,7 +145,7 @@ def save_cell_xml(f, tabs, cellName, variants):
     dx = dy = dz = 1
     if cellName == "PAD":
         xSize = zSize = 1
-        dx = dy = 0
+        dx = dz = 0
 
     f.write("%s<cell name=\"%s\" xSize=\"%d\" ySize=\"%d\" zSize=\"%d\">\n" % (tabsStr, cellName, xSize, ySize, zSize))
     index = 1
