@@ -386,7 +386,7 @@ slice()
             i--;
             goto flush;
         }
-        if (inventory.value(blockType) == 64)
+        if (inventory.value(blockType) == 16) // Workaround for ComputerCraft bug
         {
             i--;
             goto flush;
