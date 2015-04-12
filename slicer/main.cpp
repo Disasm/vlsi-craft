@@ -418,6 +418,7 @@ slice()
     TurtleState state;
     state.p = originPoint;
 
+    gCode.append("G90"); // Set absolute positioning
     gCode.append(QString("G92 X%1 Y%2 Z%3 R%4")
                  .arg(originPoint.x).arg(originPoint.y).arg(originPoint.z)
                  .arg(getRotationIndex(originDirection.x, originDirection.z)));
