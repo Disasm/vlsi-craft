@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<job>
+    <area>
+        <min x="1377" y="8" z="942"/>
+        <max x="1387" y="12" z="950"/>
+    </area>
+
+    <useAstar multiplier="2"/>
+    <sortByHPWL/>
+</job>

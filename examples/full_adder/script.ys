@@ -1,0 +1,24 @@
+read_verilog adder.v
+
+hierarchy -check -top adder
+
+#proc; opt; fsm; opt; memory; opt
+proc # get rid of processes
+opt # do nothing
+
+
+# We have to do this for the placer
+iopadmap -outpad PAD X -inpad PAD X -bits -nameparam NAME
+
+techmap
+
+abc; opt
+
+abc -liberty ../../techmap/redlogic/redlogic.lib; opt
+
+techmap -map ../../techmap/redlogic/cell2_to_3.v; opt
+
+clean
+
+#write_verilog synth.v
+write_edif synth.edif
