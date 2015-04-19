@@ -11,12 +11,14 @@ VLSI Craft is a hardware generation toolchain for Minecraft inspired by [VLSI CA
 - Simple 2D placing
 - Multilevel routing with conflicts resolving
 - [G-code](https://en.wikipedia.org/wiki/G-code) generation
+
 All other things like milti-level logic optimization and technology mapping are done by yosys and abc.
 
 ### Requirements
 - [yosys](http://www.clifford.at/yosys/download.html) (tested with version 0.5)
 - ComputerCraft mod v1.6 or later with HTTP API enabled
 - redlogic mod (tested on 57.2.1)
+- Qt (tested on 5.4.0)
 
 ### Compiling and running demo
 - Compile yosys and place binaries into tools directory
