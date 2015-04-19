@@ -21,9 +21,9 @@ All other things like milti-level logic optimization and technology mapping are 
 - Qt (tested on 5.4.0)
 
 ### Compiling and running demo
-- Compile yosys and place binaries into tools directory
-- Compile all other tools from this project and place them into tools directory
-- Go to examples/full_adder directory
+- Compile yosys and place binaries into `tools` directory
+- Compile all other tools from this project and place them into `tools` directory
+- Go to `examples/full_adder` directory
 - Adjust `*_job.xml` files according to your world coordinates
 - Run `make`
 - You will get `result.gcode` file, transfer it to the Pastebin
